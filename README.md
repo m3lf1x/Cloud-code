@@ -47,14 +47,14 @@ Cloud Code — десктопное приложение с интерфейсо
    ```bash
    npm i -g opencode-ai
    ```
-2. Скачай `CloudCode.exe` на странице [Releases](https://github.com/YOUR_USERNAME/cloud-code/releases/latest).
+2. Скачай `CloudCode.exe` на странице [Releases](https://github.com/m3lf1x/Cloud-code/releases/latest).
 3. Запусти. Если окно не открывается, установи [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
 
 ### Из исходников
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/cloud-code.git
-cd cloud-code
+git clone https://github.com/m3lf1x/Cloud-code.git
+cd Cloud-code
 pip install pywebview
 npm i -g opencode-ai
 python main.py
@@ -76,8 +76,6 @@ python main.py
 | `Ctrl + K` | Новый чат |
 | `Ctrl + B` | Свернуть боковую панель |
 | `Ctrl + 1 / 2 / 3` | Чат / Файлы / Изменения |
-
-
 
 ## Как это работает
 
