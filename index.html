@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cloud Code by m3lf1x — бесплатный AI-разработчик</title>
+<meta name="description" content="Cloud Code — бесплатный аналог Claude Code на базе opencode. Пиши задачу словами, получай код. Без ключей и подписки.">
+<meta property="og:title" content="Cloud Code by m3lf1x">
+<meta property="og:description" content="Бесплатный AI-разработчик на базе opencode. Без ключей. Без подписки.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#000;--panel:#0d0d0e;--panel2:#161617;--line:#252527;--txt:#f5f5f7;--dim:#a1a1a6;--dim2:#808086}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);font:17px/1.6 Inter,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+svg{display:block;flex:none}
+.wrap{width:min(1120px,100% - 40px);margin:0 auto}
+.glow{position:absolute;left:50%;top:-120px;width:min(900px,100vw);height:600px;transform:translateX(-50%);background:radial-gradient(ellipse at center,rgba(255,255,255,.14),transparent 68%);pointer-events:none}
+nav{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+.brand{display:flex;align-items:center;gap:12px;font-weight:650;letter-spacing:-.3px}
+.logo{width:36px;height:36px;border-radius:11px;background:radial-gradient(circle at 50% 0,#2a2a2d,#000 70%);border:1px solid rgba(255,255,255,.5);display:grid;place-items:center;box-shadow:0 0 20px rgba(255,255,255,.35),0 0 50px rgba(255,255,255,.15)}
+.by{font-size:12px;color:var(--dim);border:1px solid var(--line);border-radius:20px;padding:2px 9px;background:var(--panel)}
+.by b{color:#fff;text-shadow:0 0 10px rgba(255,255,255,.7)}
+.nl{display:flex;gap:22px;font-size:14px;color:var(--dim)}
+.nl a:hover{color:#fff}
+header.hero{position:relative;text-align:center;padding:70px 0 40px}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);border:1px solid var(--line);background:var(--panel);border-radius:30px;padding:6px 14px}
+.pill i{width:7px;height:7px;border-radius:50%;background:#54d69b;box-shadow:0 0 10px #54d69b}
+h1{margin:26px 0 0;font-size:clamp(44px,8.4vw,104px);line-height:1;letter-spacing:-.045em;font-weight:700}
+h1 span{background:linear-gradient(90deg,#fff,#7d7d83);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{margin:28px auto 0;max-width:640px;font-size:clamp(18px,2.4vw,24px);color:var(--dim);line-height:1.45}
+.cta{margin-top:38px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:13px 24px;border-radius:30px;font-weight:600;font-size:16px;border:1px solid #3a3a3d;background:var(--panel2);transition:.2s}
+.btn:hover{border-color:#8c8c92}
+.btn.pri{background:#f5f5f7;color:#000;border:0;box-shadow:0 0 30px rgba(255,255,255,.28)}
+.btn.pri:hover{box-shadow:0 0 44px rgba(255,255,255,.45)}
+.note{margin-top:16px;font-size:13px;color:var(--dim2)}
+
+/* app mock */
+.mock{position:relative;margin:56px auto 0;width:min(940px,100%);border:1px solid #3a3a3e;border-radius:18px;background:#000;overflow:hidden;text-align:left;box-shadow:0 0 0 1px #000,0 30px 120px rgba(255,255,255,.1)}
+.bar{display:flex;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.bar i{width:11px;height:11px;border-radius:50%;background:#2a2a2d}
+.body{display:grid;grid-template-columns:200px minmax(0,1fr);min-height:340px}
+.side{background:#070707;border-right:1px solid #1f1f22;padding:14px 12px;display:flex;flex-direction:column;gap:8px;font-size:12px}
+.side .it{padding:7px 9px;border-radius:8px;color:var(--dim2)}
+.side .it.on{background:var(--panel2);border:1px solid var(--line);color:#ededed}
+.side .nb{border:1px solid #3a3a3d;background:var(--panel2);border-radius:8px;padding:8px 10px;font-weight:600}
+.chat{min-width:0;padding:22px 26px;display:flex;flex-direction:column;gap:16px;font-size:13.5px}
+.u{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:4px 12px 12px 12px;padding:9px 13px}
+.tool{font:11px/1.5 "JetBrains Mono",Consolas,monospace;color:var(--dim2);background:rgba(255,255,255,.07);border-left:2px solid var(--dim2);padding:2px 10px;border-radius:0 6px 6px 0;width:fit-content}
+.code{border:1px solid var(--line);border-radius:10px;background:#060606;padding:11px 14px;font:11.5px/1.65 "JetBrains Mono",Consolas,monospace;color:var(--dim2);overflow-x:auto;white-space:pre}
+.code b{color:#fff}.code s{text-decoration:none;color:#8fd19e}.code u{text-decoration:none;color:#e0b878}
+
+section{padding:96px 0 0}
+h2{margin:0;font-size:clamp(32px,5vw,56px);line-height:1.08;letter-spacing:-.035em;font-weight:700;text-align:center}
+.sub{margin:16px auto 0;max-width:600px;text-align:center;color:var(--dim)}
+.grid{margin-top:48px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px;transition:.25s}
+.card:hover{border-color:#4a4a4e;transform:translateY(-3px);box-shadow:0 0 40px rgba(255,255,255,.05)}
+.ic{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);display:grid;place-items:center;margin-bottom:18px;color:#fff}
+.card h3{margin:0 0 6px;font-size:19px;letter-spacing:-.02em}
+.card p{margin:0;font-size:15px;color:var(--dim)}
+.steps{margin-top:48px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;counter-reset:s}
+.step{position:relative;padding:28px;border-radius:20px;background:linear-gradient(180deg,var(--panel),#050505);border:1px solid var(--line)}
+.step:before{counter-increment:s;content:counter(s);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#f5f5f7;color:#000;font-weight:700;margin-bottom:18px;box-shadow:0 0 22px rgba(255,255,255,.3)}
+.step h3{margin:0 0 6px;font-size:19px}.step p{margin:0;color:var(--dim);font-size:15px}
+.inst{margin:48px auto 0;width:min(760px,100%);display:flex;flex-direction:column;gap:12px}
+.cmd{min-width:0;display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font:14px "JetBrains Mono",Consolas,monospace;overflow-x:auto}
+.cmd span{white-space:nowrap}.cmd em{font-style:normal;color:var(--dim2)}
+.cmd button{flex:none;font:600 12px Inter,sans-serif;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+.cmd button:hover{border-color:#8c8c92}
+.final{margin-top:96px;padding:80px 20px;text-align:center;border:1px solid var(--line);border-radius:28px;background:radial-gradient(ellipse at 50% 0,rgba(255,255,255,.1),transparent 65%),var(--panel)}
+footer{padding:48px 0 56px;text-align:center;color:var(--dim2);font-size:14px}
+footer b{color:#fff;text-shadow:0 0 12px rgba(255,255,255,.7)}
+@media(max-width:860px){.grid,.steps{grid-template-columns:minmax(0,1fr)}.body{grid-template-columns:minmax(0,1fr)}.side{display:none}.nl{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap" style="position:relative">
+  <div class="glow"></div>
+  <nav>
+    <div class="brand">
+      <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.6 9 4.8 4.8 0 0 1 18 19z"/></svg></div>
+      Cloud Code <span class="by">by <b>m3lf1x</b></span>
+    </div>
+    <div class="nl"><a href="#features">Возможности</a><a href="#how">Как это работает</a><a href="#install">Установка</a><a href="https://github.com/YOUR_USERNAME/cloud-code">GitHub</a></div>
+  </nav>
+
+  <header class="hero">
+    <span class="pill"><i></i>Бесплатно · Open source</span>
+    <h1>Пиши словами.<br><span>Получай код.</span></h1>
+    <p class="lead">Бесплатный AI-разработчик на базе opencode. Без ключей. Без подписки.</p>
+    <div class="cta">
+      <a class="btn pri" href="https://github.com/YOUR_USERNAME/cloud-code/releases/latest"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Скачать для Windows</a>
+      <a class="btn" href="https://github.com/YOUR_USERNAME/cloud-code"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>Исходный код</a>
+    </div>
+    <div class="note">Нужны Node.js и opencode · Windows 10 / 11</div>
+
+    <div class="mock" aria-label="Скриншот интерфейса">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="body">
+        <div class="side"><div class="nb">Новый чат</div><div class="it on">Лендинг для кофейни</div><div class="it">Исправить баги в боте</div><div class="it">README для проекта</div></div>
+        <div class="chat">
+          <div class="u">Создай лендинг для кофейни: тёмная тема, меню и форма заказа.</div>
+          <div><div class="tool">| Write  index.html</div><div class="tool" style="margin-top:3px">| Write  style.css</div></div>
+          <div>Готово. Я создал адаптивный лендинг с тёмной темой, меню и формой заказа.</div>
+          <div class="code"><b>&lt;section</b> <u>class</u>=<s>"hero"</s><b>&gt;</b>
+  <b>&lt;h1&gt;</b>Кофейня «Зерно»<b>&lt;/h1&gt;</b>
+  <b>&lt;a</b> <u>href</u>=<s>"#menu"</s><b>&gt;</b>Смотреть меню<b>&lt;/a&gt;</b>
+<b>&lt;/section&gt;</b></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="features">
+    <h2>Всё, что нужно разработчику.</h2>
+    <p class="sub">Знакомый интерфейс и мощные возможности, ничего лишнего.</p>
+    <div class="grid">
+      <div class="card"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5C9.5 8.4 10.6 8 12 8s2.5.5 2.5 1.6S13.4 11 12 11s-2.5.5-2.5 1.6S10.6 14 12 14s2.5-.4 2.5-1.5"/></svg></div><h3>Бесплатно навсегда</h3><p>Автоматически выбирается бесплатная модель opencode. Ключи API не нужны.</p></div>
+      <div class="card"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div><h3>Работает с проектом</h3><p>Выбери папку, и агент сам читает и правит файлы прямо в ней.</p></div>
+      <div class="card"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></div><h3>Чаты с контекстом</h3><p>История сохраняется. Продолжай диалог после перезапуска, ищи по чатам.</p></div>
+      <div class="card"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div><h3>Файлы и подсветка</h3><p>Дерево проекта, просмотр кода с подсветкой, упоминание файла через @.</p></div>
+      <div class="card"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6 8.5v7M18 11.5c0 4-12 1-12 4"/></svg></div><h3>Diff изменений</h3><p>Смотри, что именно изменил агент: цветной diff из git по каждому файлу.</p></div>
+      <div class="card"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></div><h3>Тёмная тема</h3><p>Чёрный интерфейс с мягким свечением. Есть и светлая тема, если захочется.</p></div>
+    </div>
+  </section>
+
+  <section id="how">
+    <h2>Три шага.</h2>
+    <p class="sub">От идеи до готового кода за пару минут.</p>
+    <div class="steps">
+      <div class="step"><h3>Выбери папку</h3><p>Укажи проект, с которым будет работать агент.</p></div>
+      <div class="step"><h3>Опиши задачу</h3><p>Обычным языком, как коллеге. Можно упомянуть файлы через @.</p></div>
+      <div class="step"><h3>Получи результат</h3><p>Агент напишет код и внесёт правки. Проверь их во вкладке «Изменения».</p></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Установка за минуту.</h2>
+    <p class="sub">Нужны Python 3.10+ и Node.js. Или скачай готовый exe со страницы релизов.</p>
+    <div class="inst">
+      <div class="cmd"><span><em>$</em> npm i -g opencode-ai</span><button onclick="cp(this,'npm i -g opencode-ai')">Копировать</button></div>
+      <div class="cmd"><span><em>$</em> pip install pywebview</span><button onclick="cp(this,'pip install pywebview')">Копировать</button></div>
+      <div class="cmd"><span><em>$</em> python main.py</span><button onclick="cp(this,'python main.py')">Копировать</button></div>
+    </div>
+    <div class="final">
+      <h2>Попробуй Cloud Code.</h2>
+      <p class="sub">Бесплатно, открыто и без регистрации.</p>
+      <div class="cta">
+        <a class="btn pri" href="https://github.com/YOUR_USERNAME/cloud-code/releases/latest">Скачать для Windows</a>
+        <a class="btn" href="https://github.com/YOUR_USERNAME/cloud-code">Открыть на GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>Cloud Code <b>by m3lf1x</b></div>
+    <div style="margin-top:8px">Независимый open source проект. Не связан с Anthropic. Работает на <a href="https://opencode.ai" style="text-decoration:underline">opencode</a>.</div>
+  </footer>
+</div>
+<script>
+function cp(b,t){
+  const done=()=>{const o=b.textContent;b.textContent="Готово";setTimeout(()=>b.textContent=o,1200)};
+  if(navigator.clipboard)navigator.clipboard.writeText(t).then(done,done);else done();
+}
+</script>
+</body>
+</html>
