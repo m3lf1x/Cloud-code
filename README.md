@@ -77,16 +77,7 @@ python main.py
 | `Ctrl + B` | Свернуть боковую панель |
 | `Ctrl + 1 / 2 / 3` | Чат / Файлы / Изменения |
 
-## Сборка в exe
 
-```bash
-pip install pyinstaller pywebview
-pyinstaller --onefile --windowed --icon icon.ico --name CloudCode main.py
-```
-
-Готовый файл появится в `dist/CloudCode.exe`.
-
-> Если PyInstaller падает с `IndexError: tuple index out of range`, это известный баг Python 3.10.0. Используй Python 3.10.11+ или 3.11+.
 
 ## Как это работает
 
