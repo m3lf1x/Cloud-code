@@ -12,7 +12,7 @@
 
 <br>
 
-<img src="docs/screenshot.png" alt="Cloud Code" width="900">
+<img src="docs/banner.png" alt="Cloud Code by m3lf1x" width="100%">
 
 <br>
 
@@ -27,6 +27,23 @@
 Cloud Code — десктопное приложение с интерфейсом в стиле Claude Code, которое работает поверх [opencode](https://opencode.ai) и бесплатных моделей. Ни ключей API, ни подписки: ставишь, выбираешь папку проекта и ставишь задачу обычным языком.
 
 Интерфейс написан на HTML и открывается в окне Python через `pywebview`. Всё в одном файле.
+
+## Скриншоты
+
+<p align="center">
+  <img src="docs/screenshot.png" alt="Чат с агентом" width="100%">
+  <br><sub><b>Чат.</b> Потоковые ответы, подсветка кода и кнопка «копировать».</sub>
+</p>
+
+<p align="center">
+  <img src="docs/files.png" alt="Файлы проекта" width="100%">
+  <br><sub><b>Файлы.</b> Дерево проекта и просмотр кода с подсветкой.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/diff.png" alt="Изменения" width="100%">
+  <br><sub><b>Изменения.</b> Цветной diff из git по каждому файлу.</sub>
+</p>
 
 ## Возможности
 
