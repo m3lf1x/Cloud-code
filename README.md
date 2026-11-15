@@ -1,0 +1,123 @@
+<div align="center">
+
+# Cloud Code
+
+**Бесплатный AI-разработчик для твоих проектов.**
+Пиши задачу словами — получай код и изменения прямо в файлах.
+
+[![Python](https://img.shields.io/badge/Python-3.10+-000000?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![opencode](https://img.shields.io/badge/powered%20by-opencode-000000?style=for-the-badge)](https://opencode.ai)
+[![License](https://img.shields.io/badge/license-MIT-000000?style=for-the-badge)](LICENSE)
+[![Platform](https://img.shields.io/badge/Windows-000000?style=for-the-badge&logo=windows&logoColor=white)](#установка)
+
+<br>
+
+<img src="docs/screenshot.png" alt="Cloud Code" width="900">
+
+<br>
+
+**by m3lf1x**
+
+</div>
+
+---
+
+## Что это
+
+Cloud Code — десктопное приложение с интерфейсом в стиле Claude Code, которое работает поверх [opencode](https://opencode.ai) и бесплатных моделей. Ни ключей API, ни подписки: ставишь, выбираешь папку проекта и ставишь задачу обычным языком.
+
+Интерфейс написан на HTML и открывается в окне Python через `pywebview`. Всё в одном файле.
+
+## Возможности
+
+- **Бесплатно.** Автоматически выбирается бесплатная модель opencode. Свои провайдеры подключаются через `opencode auth login`.
+- **Работает с твоим проектом.** Агент читает и правит файлы в выбранной папке.
+- **Потоковые ответы.** Текст печатается по мере генерации, есть таймер и кнопка «Стоп».
+- **Чаты с контекстом.** История сохраняется, поиск по чатам, диалог можно продолжить после перезапуска.
+- **Файлы проекта.** Дерево файлов, просмотр с подсветкой синтаксиса, упоминание файла в чате через `@`.
+- **Изменения.** Список изменённых файлов из git и цветной diff.
+- **Markdown и код.** Заголовки, списки, блоки кода с подсветкой и кнопкой «копировать».
+- **Тёмная и светлая тема**, горячие клавиши, сворачиваемая панель.
+
+## Установка
+
+### Готовая сборка (Windows)
+
+1. Установи [Node.js](https://nodejs.org) и opencode:
+   ```bash
+   npm i -g opencode-ai
+   ```
+2. Скачай `CloudCode.exe` на странице [Releases](https://github.com/YOUR_USERNAME/cloud-code/releases/latest).
+3. Запусти. Если окно не открывается, установи [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
+
+### Из исходников
+
+```bash
+git clone https://github.com/YOUR_USERNAME/cloud-code.git
+cd cloud-code
+pip install pywebview
+npm i -g opencode-ai
+python main.py
+```
+
+## Использование
+
+1. Нажми **«Выбрать папку»** и укажи свой проект.
+2. Напиши задачу, например: *«Создай лендинг для кофейни: тёмная тема, меню и форма заказа»*.
+3. Смотри, как агент работает, во вкладках **Файлы** и **Изменения**.
+
+### Горячие клавиши
+
+| Клавиша | Действие |
+| --- | --- |
+| `Enter` | Отправить сообщение |
+| `Shift + Enter` | Новая строка |
+| `Esc` | Остановить ответ |
+| `Ctrl + K` | Новый чат |
+| `Ctrl + B` | Свернуть боковую панель |
+| `Ctrl + 1 / 2 / 3` | Чат / Файлы / Изменения |
+
+## Сборка в exe
+
+```bash
+pip install pyinstaller pywebview
+pyinstaller --onefile --windowed --icon icon.ico --name CloudCode main.py
+```
+
+Готовый файл появится в `dist/CloudCode.exe`.
+
+> Если PyInstaller падает с `IndexError: tuple index out of range`, это известный баг Python 3.10.0. Используй Python 3.10.11+ или 3.11+.
+
+## Как это работает
+
+```
+Интерфейс (HTML/CSS/JS)  ←→  pywebview  ←→  Python  ←→  opencode run  ←→  модель
+```
+
+Каждое сообщение уходит в `opencode run` в выбранной папке. Контекст диалога и текст запроса передаются через stdin, ответ читается потоком и показывается в интерфейсе. Чаты и настройки хранятся в `~/.cloud_code`.
+
+## Частые вопросы
+
+**opencode не найден.** Установи его (`npm i -g opencode-ai`) и перезапусти приложение. Программа ищет его в `PATH` и в стандартных папках npm.
+
+**Пустой ответ.** Нажми кнопку обновления рядом с полем модели и выбери рабочую бесплатную модель. Проверь интернет.
+
+**Где хранятся чаты.** В папке `.cloud_code` в твоей домашней директории (`chats.json`, `config.json`).
+
+## Дисклеймер
+
+Cloud Code — независимый open source проект. Он не связан с Anthropic и не является их продуктом. Название отсылает к идее и не означает аффилированности.
+
+## Лицензия
+
+MIT. Делай что хочешь, оставь авторство.
+
+---
+
+<div align="center">
+
+**Cloud Code by m3lf1x**
+
+Если проект полезен, поставь звезду.
+
+</div>
