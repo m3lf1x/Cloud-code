@@ -1,20 +1,12 @@
-<div align="center">
+ <div align="center">
 
 # Cloud Code
 
-**Бесплатный AI-разработчик для твоих проектов.**
-Пиши задачу словами — получай код и изменения прямо в файлах.
+**Бесплатный AI-разработчик для твоих проектов.** Пиши задачу словами — получай код и изменения прямо в файлах.
 
-[![Python](https://img.shields.io/badge/Python-3.10+-000000?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![opencode](https://img.shields.io/badge/powered%20by-opencode-000000?style=for-the-badge)](https://opencode.ai)
-[![License](https://img.shields.io/badge/license-MIT-000000?style=for-the-badge)](LICENSE)
-[![Platform](https://img.shields.io/badge/Windows%20%7C%20macOS-000000?style=for-the-badge)](#установка)
-
-<br>
+[Python](https://www.python.org/) · [opencode](https://opencode.ai/) · [License](https://github.com/m3lf1x/Cloud-code/blob/main/LICENSE)
 
 <img src="docs/banner.png" alt="Cloud Code by m3lf1x" width="100%">
-
-<br>
 
 **by m3lf1x**
 
@@ -24,7 +16,7 @@
 
 ## Что это
 
-Cloud Code — десктопное приложение с интерфейсом в стиле Claude Code, которое работает поверх [opencode](https://opencode.ai) и бесплатных моделей. Ни ключей API, ни подписки: ставишь, выбираешь папку проекта и ставишь задачу обычным языком.
+Cloud Code — десктопное приложение с интерфейсом в стиле Claude Code, которое работает поверх [opencode](https://opencode.ai/) и бесплатных моделей. Ни ключей API, ни подписки: устанавливаешь зависимости, выбираешь папку проекта и ставишь задачу обычным языком.
 
 Интерфейс написан на HTML и открывается в окне Python через `pywebview`. Всё в одном файле.
 
@@ -55,45 +47,46 @@ Cloud Code — десктопное приложение с интерфейсо
 - **Изменения.** Список изменённых файлов из git и цветной diff.
 - **Markdown и код.** Заголовки, списки, блоки кода с подсветкой и кнопкой «копировать».
 - **Быстрые команды.** Набери `/` в поле ввода: `/объясни`, `/ошибки`, `/ревью`, `/тесты`, `/рефактор`, `/readme`, `/коммит`, `/план`.
-- **Режим «план».** Агент только анализирует проект и ничего не меняет в файлах. Переключается кнопкой над полем ввода.
-- **Повторить ответ**, время генерации под каждым ответом, **экспорт чата в Markdown**.
+- **Режим «план».** Агент только анализирует проект и ничего не меняет в файлах.
+- **Повторить ответ**, время генерации и **экспорт чата в Markdown**.
 - **Проверка обновлений.** Программа сама сообщит о новой версии.
 - **Тёмная и светлая тема**, горячие клавиши, сворачиваемая панель.
 
 ## Установка
 
-### Готовая сборка (Windows)
+### Требования
 
-1. Установи [Node.js](https://nodejs.org) и opencode:
+- Python 3.10+
+- Node.js
+- opencode
+
+### Установка зависимостей
+
+1. Установи [Python](https://www.python.org/) и [Node.js](https://nodejs.org/).
+2. Установи opencode:
+
    ```bash
    npm i -g opencode-ai
    ```
-2. Скачай `CloudCode.exe` на странице [Releases](https://github.com/m3lf1x/Cloud-code/releases/latest).
-3. Запусти. Если окно не открывается, установи [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
 
-### Готовая сборка (macOS)
+3. Склонируй репозиторий:
 
-1. Установи opencode одной из команд:
    ```bash
-   curl -fsSL https://opencode.ai/install | bash
-   # или
-   npm i -g opencode-ai
-   ```
-2. Скачай `CloudCode-macOS.zip` на странице [Releases](https://github.com/m3lf1x/Cloud-code/releases/latest), распакуй и перетащи `Cloud Code.app` в «Программы».
-3. При первом запуске нажми на приложение правой кнопкой → **Открыть** (приложение не подписано Apple). Если macOS пишет, что файл повреждён, выполни:
-   ```bash
-   xattr -cr "/Applications/Cloud Code.app"
+   git clone https://github.com/m3lf1x/Cloud-code.git
+   cd Cloud-code
    ```
 
-### Из исходников
+4. Установи Python-зависимости:
 
-```bash
-git clone https://github.com/m3lf1x/Cloud-code.git
-cd Cloud-code
-pip install pywebview
-npm i -g opencode-ai
-python main.py      # на macOS: python3 main.py
-```
+   ```bash
+   pip install pywebview
+   ```
+
+5. Запусти приложение:
+
+   ```bash
+   python main.py
+   ```
 
 ## Использование
 
@@ -104,18 +97,18 @@ python main.py      # на macOS: python3 main.py
 ### Горячие клавиши
 
 | Клавиша | Действие |
-| --- | --- |
+|---|---|
 | `Enter` | Отправить сообщение |
 | `Shift + Enter` | Новая строка |
 | `Esc` | Остановить ответ |
 | `/` | Быстрые команды |
-| `Ctrl + K` (`Cmd + K` на Mac) | Новый чат |
-| `Ctrl + B` (`Cmd + B` на Mac) | Свернуть боковую панель |
+| `Ctrl + K` | Новый чат |
+| `Ctrl + B` | Свернуть боковую панель |
 | `Ctrl + 1 / 2 / 3` | Чат / Файлы / Изменения |
 
 ## Как это работает
 
-```
+```text
 Интерфейс (HTML/CSS/JS)  ←→  pywebview  ←→  Python  ←→  opencode run  ←→  модель
 ```
 
@@ -123,27 +116,31 @@ python main.py      # на macOS: python3 main.py
 
 ## Частые вопросы
 
-**opencode не найден.** Установи его (`npm i -g opencode-ai`) и перезапусти приложение. Программа ищет его в `PATH` и в стандартных папках (npm, Homebrew, `~/.opencode/bin`). На macOS дополнительно используется `PATH` твоего терминала.
+**opencode не найден.** Установи его:
 
-**Failed to load Python DLL ... `_internal\python310.dll`.** exe собран как папка (без `--onefile`) и запущен без папки `_internal`, либо антивирус удалил DLL. Скачай готовый `CloudCode.exe` из [Releases](https://github.com/m3lf1x/Cloud-code/releases/latest) или собери заново через `build_win.bat`. Если запускаешь собранную папку целиком, не переноси `CloudCode.exe` отдельно от `_internal`. Если не помогло, установи [Microsoft Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) и проверь карантин антивируса.
+```bash
+npm i -g opencode-ai
+```
 
-**«Порядковый номер 380 не найден в библиотеке DLL ...CloudCode.exe».** Это вторичная ошибка: при старте exe произошла настоящая ошибка, а окно с её описанием само упало ([баг PyInstaller](https://github.com/pyinstaller/pyinstaller/issues/6223)). В версии 1.1.1 ошибки показываются обычным окном и пишутся в `~/.cloud_code/error.log`. Чтобы увидеть причину у старой сборки, запусти `python main.py` из папки с проектом или собери отладочную версию: `build_win.bat debug` (запускай `dist\CloudCodeDebug.exe` из `cmd`, там виден traceback). Чаще всего причина в том, что `pywebview` собран в Python без `pythonnet` (используй Python 3.11 или 3.12) или не установлен [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
+Перезапусти приложение. Программа ищет opencode в `PATH` и стандартных папках установки.
 
 **Пустой ответ.** Нажми кнопку обновления рядом с полем модели и выбери рабочую бесплатную модель. Проверь интернет.
 
-**Где хранятся чаты.** В папке `.cloud_code` в твоей домашней директории (`chats.json`, `config.json`).
+**Где хранятся чаты?** В папке `.cloud_code` в твоей домашней директории (`chats.json`, `config.json`).
 
 ## История версий
 
 **1.1.1**
-- быстрые команды через `/`
-- режим «план» (только чтение)
-- повторить ответ, время генерации, экспорт чата в Markdown
-- кнопка «Открыть папку проекта»
-- проверка обновлений
-- сборка Windows одним файлом через `build_win.bat`
-- понятное окно ошибки при сбое запуска и лог `~/.cloud_code/error.log`
-- `build_win.bat debug` для отладочной сборки с консолью
+- Понятное окно ошибки при сбое запуска.
+- Лог ошибок `~/.cloud_code/error.log`.
+- Улучшенная диагностика.
+
+**1.1.0**
+- Быстрые команды через `/`.
+- Режим «план» (только чтение).
+- Повторить ответ, время генерации, экспорт чата в Markdown.
+- Кнопка «Открыть папку проекта».
+- Проверка обновлений.
 
 **1.0.0** — первый релиз.
 
@@ -161,6 +158,6 @@ MIT. Делай что хочешь, оставь авторство.
 
 **Cloud Code by m3lf1x**
 
-Если проект полезен, поставь звезду.
+Если проект полезен, поставь звезду ⭐
 
 </div>
