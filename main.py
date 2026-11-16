@@ -18,12 +18,30 @@ import sys
 import threading
 from pathlib import Path
 
-# в exe без консоли (--noconsole) stdout/stderr/stdin отсутствуют
+# убираем собственную консоль программы (даже если exe собран без --windowed).
+# Для отладки с консолью: set CC_DEBUG=1
+if sys.platform == "win32" and not os.environ.get("CC_DEBUG"):
+    try:
+        import ctypes
+        _h = ctypes.windll.kernel32.GetConsoleWindow()
+        if _h:
+            ctypes.windll.user32.ShowWindow(_h, 0)
+        ctypes.windll.kernel32.FreeConsole()
+    except Exception:
+        pass
+    for _n in ("stdout", "stderr"):
+        setattr(sys, _n, open(os.devnull, "w"))
 for _n in ("stdout", "stderr"):
     if getattr(sys, _n) is None:
         setattr(sys, _n, open(os.devnull, "w"))
 
-import webview
+import traceback
+
+try:
+    import webview
+except Exception:  # например, не установлен pythonnet: покажем понятную ошибку при старте
+    webview = None
+    _IMPORT_ERR = traceback.format_exc()
 
 APP = Path.home() / ".cloud_code"
 APP.mkdir(exist_ok=True)
@@ -32,6 +50,13 @@ ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
 IGNORE = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".next", ".idea", ".vscode", ".DS_Store"}
 NOWIN = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 WIN = sys.platform == "win32"
+VERSION = "1.1.1"
+REPO = "m3lf1x/Cloud-code"
+
+
+def _dlg(kind):  # совместимо с разными версиями pywebview
+    FD = getattr(webview, "FileDialog", None)
+    return getattr(FD, kind) if FD else getattr(webview, kind + "_DIALOG")
 
 
 def _si():  # полностью скрывает консольное окно дочерних процессов (Windows)
@@ -48,6 +73,26 @@ def jload(p, default):
         return json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return default
+
+
+def fix_path():
+    """macOS/Linux: приложение, запущенное из Finder, не видит PATH терминала.
+    Добавляем типичные папки и, если opencode не найден, берём PATH из login-shell."""
+    if WIN:
+        return
+    h = Path.home()
+    extra = ["/opt/homebrew/bin", "/usr/local/bin", str(h / ".opencode" / "bin"), str(h / ".bun" / "bin"),
+             str(h / ".npm-global" / "bin"), str(h / ".local" / "bin")]
+    os.environ["PATH"] = ":".join(dict.fromkeys([p for p in os.environ.get("PATH", "").split(":") + extra if p]))
+    if not shutil.which("opencode"):
+        try:
+            sh = os.environ.get("SHELL") or "/bin/zsh"
+            out = subprocess.run([sh, "-ilc", 'printf "%s" "$PATH"'], capture_output=True, text=True,
+                                 timeout=8, stdin=subprocess.DEVNULL).stdout.strip().splitlines()
+            if out:
+                os.environ["PATH"] = ":".join(dict.fromkeys([p for p in out[-1].split(":") + os.environ["PATH"].split(":") if p]))
+        except Exception:
+            pass
 
 
 def find_oc():
@@ -116,7 +161,7 @@ class Api:
         return "" if v.startswith("ERROR") else v
 
     def state(self):
-        return {"chats": jload(CHATS, []), "cfg": {**self.cfg, "cwd": self.cwd}}
+        return {"chats": jload(CHATS, []), "cfg": {**self.cfg, "cwd": self.cwd}, "version": VERSION}
 
     def save_chats(self, data):
         try:
@@ -132,7 +177,7 @@ class Api:
             pass
 
     def choose_folder(self):
-        res = self.window.create_file_dialog(webview.FOLDER_DIALOG, directory=self.cwd)
+        res = self.window.create_file_dialog(_dlg("FOLDER"), directory=self.cwd)
         if res:
             self.cwd = res[0]
             self.set_cfg("cwd", self.cwd)
@@ -190,31 +235,107 @@ class Api:
         out = self._run([self.git_bin, "diff", "HEAD", "--", path])
         return out or self._run([self.git_bin, "diff", "--", path]) or "Нет изменений"
 
+    # ---------- обновления, папка, экспорт ----------
+    def check_update(self):
+        try:
+            import urllib.request
+            req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
+                                         headers={"User-Agent": "CloudCode"})
+            d = json.loads(urllib.request.urlopen(req, timeout=6).read().decode("utf-8"))
+            tag = str(d.get("tag_name", ""))
+            num = lambda v: tuple(int(x) for x in re.findall(r"\d+", v)[:3])
+            if tag and num(tag) > num(VERSION):
+                return {"new": True, "version": tag.lstrip("vV"), "url": d.get("html_url") or f"https://github.com/{REPO}/releases/latest"}
+        except Exception:
+            pass
+        return {"new": False}
+
+    def open_url(self, url):
+        if str(url).startswith("https://github.com/"):
+            import webbrowser
+            webbrowser.open(url)
+
+    def open_folder(self):
+        try:
+            if WIN:
+                os.startfile(self.cwd)
+            else:
+                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", self.cwd])
+        except Exception:
+            pass
+
+    def export_chat(self, title, text):
+        try:
+            name = re.sub(r'[\\/:*?"<>|]+', "", title).strip()[:40] or "chat"
+            res = self.window.create_file_dialog(_dlg("SAVE"), directory=self.cwd, save_filename=name + ".md")
+            if not res:
+                return ""
+            path = Path(res if isinstance(res, str) else res[0])
+            path.write_text(text, encoding="utf-8")
+            return path.name
+        except Exception:
+            return ""
+
+    # ---------- буфер обмена (надёжно, без браузерных ограничений) ----------
+    def copy(self, text):
+        if WIN:
+            import ctypes
+            k, u = ctypes.windll.kernel32, ctypes.windll.user32
+            k.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+            k.GlobalAlloc.restype = ctypes.c_void_p
+            k.GlobalLock.argtypes = [ctypes.c_void_p]
+            k.GlobalLock.restype = ctypes.c_void_p
+            k.GlobalUnlock.argtypes = [ctypes.c_void_p]
+            u.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+            data = (text + "\0").encode("utf-16le")
+            h = k.GlobalAlloc(0x0042, len(data))
+            p = k.GlobalLock(h)
+            ctypes.memmove(p, data, len(data))
+            k.GlobalUnlock(h)
+            for _ in range(10):
+                if u.OpenClipboard(None):
+                    u.EmptyClipboard()
+                    u.SetClipboardData(13, h)
+                    u.CloseClipboard()
+                    return True
+                threading.Event().wait(0.05)
+            return False
+        for c in (["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard"]):
+            if shutil.which(c[0]):
+                subprocess.run(c, input=text.encode("utf-8"))
+                return True
+        return False
+
     # ---------- запуск opencode ----------
-    def send(self, prompt, model="", cont=False, context=""):
+    def send(self, prompt, model="", cont=False, context="", agent=""):
         if not self.oc:
             self._js("onError", "opencode не найден. Установи: npm i -g opencode-ai")
             self._js("onDone", 1)
             return
-        threading.Thread(target=self._worker, args=(prompt, model, cont, context), daemon=True).start()
+        threading.Thread(target=self._worker, args=(prompt, model, cont, context, agent), daemon=True).start()
 
-    def _worker(self, prompt, model, cont, context):
+    def _worker(self, prompt, model, cont, context, agent=""):
         if context:
             prompt = f"{context}\n\nНовое сообщение пользователя:\n{prompt}"
-        if WIN and self.oc.lower().endswith((".cmd", ".bat")):
-            prompt = prompt.replace('"', "'")
+        # переносы строк в аргументах ломаются (cmd.exe режет по первому Enter),
+        # поэтому весь текст запроса и контекст идут через stdin, а в аргументе — короткая строка
         cmd = [self.oc, "run"]
-        if cont:
-            cmd.append("--continue")
         if model.strip():
             cmd += ["--model", model.strip()]
-        cmd.append(prompt)
+        if agent == "plan":  # режим «план»: агент только анализирует, файлы не меняет
+            cmd += ["--agent", "plan"]
+        cmd.append("Выполни запрос пользователя. Полный текст запроса (с переносами строк) передан ниже.")
         rc = 1
         try:
             self.proc = subprocess.Popen(
                 cmd, cwd=self.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL, env={**os.environ, "NO_COLOR": "1", "TERM": "dumb"},
+                stdin=subprocess.PIPE, env={**os.environ, "NO_COLOR": "1", "TERM": "dumb"},
                 creationflags=NOWIN, startupinfo=_si())
+            try:
+                self.proc.stdin.write(prompt.encode("utf-8"))
+                self.proc.stdin.close()
+            except Exception:
+                pass
             dec = codecs.getincrementaldecoder("utf-8")("replace")
             while True:
                 chunk = self.proc.stdout.read1(4096)
@@ -247,7 +368,8 @@ HTML = r"""<!doctype html>
 [data-theme=light]{--bg:#f5f5f6;--bg2:#ebebed;--panel:#fff;--panel2:#f0f0f2;--line:#d9d9de;--txt:#111;--dim:#5e5e66;--dim2:#8f8f98;--acc:#111;--accsoft:#0000000d;--code:#f1f1f3;--shadow:0 14px 40px #0002;color-scheme:light}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--txt);font:14px/1.6 Inter,"Segoe UI",system-ui,sans-serif;overflow:hidden}
+body{background:var(--bg);color:var(--txt);font:14px/1.6 Inter,"Segoe UI",system-ui,sans-serif;overflow:hidden;-webkit-user-select:text;user-select:text}
+button{-webkit-user-select:none;user-select:none}
 button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:6px 11px;transition:.15s;display:inline-flex;align-items:center;gap:7px;justify-content:center}
 button:hover{border-color:var(--dim)}
@@ -256,7 +378,7 @@ svg{flex:none;display:block}
 kbd{font:10px Consolas,monospace;background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--dim)}
 .hidden{display:none!important}
 .app{display:grid;grid-template-columns:276px 1fr;height:100vh}
-.app.collapsed{grid-template-columns:0 1fr}.app.collapsed .sb{display:none}
+.app.collapsed{grid-template-columns:1fr}.app.collapsed .sb{display:none}
 
 .sb{background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px 12px;gap:10px;min-height:0}
 .brand{display:flex;align-items:center;gap:12px;padding:2px 6px 12px}
@@ -316,7 +438,7 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0;background:radi
 .msg.user .av{color:var(--dim)}
 .mb{flex:1;min-width:0}
 .who{font-size:11px;color:var(--dim);margin:3px 0 6px;display:flex;gap:10px;align-items:center}
-.who .cb{opacity:0;border:0;background:none;padding:0;color:var(--dim2);font-size:11px}.msg:hover .cb{opacity:1}.cb:hover{color:var(--txt)}
+.who .cb{opacity:.75;border:0;background:none;padding:0;color:var(--dim2);font-size:11px}.msg:hover .cb{opacity:1}.cb:hover{color:var(--txt)}
 .msg.user .tx{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:10px 14px;display:inline-block;max-width:100%}
 .tx{overflow-wrap:anywhere}
 .tx p{margin:0 0 10px}.tx h2,.tx h3,.tx h4,.tx h5{margin:16px 0 8px;letter-spacing:-.3px}.tx h2{font-size:20px}.tx h3{font-size:17px}.tx h4,.tx h5{font-size:15px}
@@ -366,18 +488,27 @@ ul.tree{list-style:none;margin:0;padding-left:14px}ul.tree.root{padding-left:0}
 .st.M{color:var(--warn);background:#e2a84c22}.st.A,.st.\?{color:var(--ok);background:#54d69b22}.st.D{color:var(--bad);background:#ef6b7b22}.st.R{color:var(--txt);background:var(--accsoft)}
 .dl{display:block;padding:0 16px}.dl.a{background:#54d69b18;color:var(--ok)}.dl.d{background:#ef6b7b18;color:var(--bad)}.dl.h{background:var(--accsoft);color:var(--dim)}
 .banner{background:#ef6b7b1c;border:1px solid #ef6b7b55;color:var(--bad);border-radius:10px;padding:9px 13px;margin-bottom:16px;font-size:12.5px}
-@media(max-width:820px){.app{grid-template-columns:0 1fr}.sb{display:none}.sug{grid-template-columns:1fr}.model{width:150px}.welcome h1{font-size:30px}}
+.box{position:relative}
+.mode{font-size:11px;padding:3px 10px;border-radius:20px;color:var(--dim);white-space:nowrap}
+.mode.plan{color:var(--warn);border-color:#e2a84c66}
+.slash{position:absolute;left:0;right:0;bottom:calc(100% + 8px);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px;box-shadow:var(--shadow);z-index:10;max-height:270px;overflow:auto}
+.slash .it{display:flex;gap:12px;align-items:baseline;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+.slash .it b{font:600 12.5px Consolas,Menlo,monospace;min-width:96px}
+.slash .it span{color:var(--dim);font-size:12px}
+.slash .it.on,.slash .it:hover{background:var(--panel2)}
+.banner.info{background:var(--accsoft);border-color:var(--line);color:var(--txt);display:flex;align-items:center;justify-content:space-between;gap:12px}
+@media(max-width:820px){.app{grid-template-columns:1fr}.sb{display:none}.sug{grid-template-columns:1fr}.model{width:150px}.welcome h1{font-size:30px}}
 </style></head><body>
 <div class="app" id="app">
 <aside class="sb">
   <div class="brand"><div class="logo"><i data-i="cloud" data-s="22"></i></div><div><div class="bn">cloud code</div><div class="by">by <b>m3lf1x</b></div></div></div>
-  <button class="newchat" onclick="newChat()"><span><i data-i="plus" data-s="15"></i>Новый чат</span><kbd>Ctrl K</kbd></button>
+  <button class="newchat" onclick="newChat()"><span><i data-i="plus" data-s="15"></i>Новый чат</span><kbd id="k1">Ctrl K</kbd></button>
   <input class="search" id="q" placeholder="Поиск по чатам…" oninput="renderChats()">
   <div class="lbl">ЧАТЫ</div>
   <div class="chats" id="chats"></div>
-  <div class="proj"><div class="h">ПРОЕКТ</div><div class="p" id="cwd">…</div><button onclick="chooseFolder()" style="width:100%;font-size:12px">Выбрать папку<i data-i="ext" data-s="13"></i></button></div>
+  <div class="proj"><div class="h">ПРОЕКТ</div><div class="p" id="cwd">…</div><div style="display:flex;gap:6px"><button onclick="chooseFolder()" style="flex:1;font-size:12px">Выбрать папку<i data-i="ext" data-s="13"></i></button><button onclick="api().open_folder()" title="Открыть папку проекта" style="padding:6px 9px"><i data-i="folder" data-s="14"></i></button></div></div>
   <div class="conn"><span class="dot" id="dot"></span><span id="st">Проверка opencode…</span></div>
-  <div class="sig">Cloud Code <b>by m3lf1x</b></div>
+  <div class="sig" id="sig">Cloud Code <b>by m3lf1x</b></div>
 </aside>
 <main>
   <header class="top">
@@ -392,6 +523,7 @@ ul.tree{list-style:none;margin:0;padding-left:14px}ul.tree.root{padding-left:0}
     <input class="model" id="model" list="ml" placeholder="модель: авто (бесплатная)" onchange="S.cfgSet('model',this.value)">
     <datalist id="ml"></datalist>
     <button class="ib" onclick="loadModels()" title="Обновить список моделей"><i data-i="refresh" data-s="16"></i></button>
+    <button class="ib" onclick="exportChat()" title="Экспорт чата в .md"><i data-i="download" data-s="16"></i></button>
     <button class="ib" onclick="theme()" title="Тема" id="th"></button>
   </header>
 
@@ -413,8 +545,9 @@ ul.tree{list-style:none;margin:0;padding-left:14px}ul.tree.root{padding-left:0}
     </div></div>
     <div class="comp"><div class="wrap">
       <div class="box">
+        <div id="slash" class="slash hidden"></div>
         <textarea id="inp" rows="2" placeholder="Что сделать в проекте?  Можно упомянуть файл через вкладку «Файлы»…"></textarea>
-        <div class="cb2"><span class="hint" id="hint"></span>
+        <div class="cb2"><span style="display:flex;align-items:center;gap:12px;min-width:0"><button class="mode" id="mode" onclick="toggleMode()"></button><span class="hint" id="hint"></span></span>
         <button class="send" id="btn" onclick="act()"></button></div>
       </div>
       <div class="foot">Cloud Code <b>by m3lf1x</b> · работает на opencode · бесплатные модели без ключа</div>
@@ -461,16 +594,19 @@ pen:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>',
 spark:'<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/>',
 warn:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>',
 at:'<circle cx="12" cy="12" r="3.5"/><path d="M15.5 12v1.5a2.5 2.5 0 0 0 5 0V12a8.5 8.5 0 1 0-3.4 6.8"/>',
-ext:'<path d="M7 17L17 7M8 7h9v9"/>'};
+ext:'<path d="M7 17L17 7M8 7h9v9"/>',
+download:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>'};
 const ic=(n,s=16)=>'<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(P[n]||"")+'</svg>';
 document.querySelectorAll("[data-i]").forEach(e=>{e.outerHTML=ic(e.dataset.i,+e.dataset.s||16)});
-const HINT='<kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос · <kbd>Esc</kbd> стоп';
+if(/Mac/i.test(navigator.platform))$("k1").textContent="Cmd K";
+const HINT='<kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос · <kbd>Esc</kbd> стоп · <kbd>/</kbd> команды';
 $("hint").innerHTML=HINT;$("btn").innerHTML="Отправить"+ic("up",15);
 
 /* ---------- копирование ---------- */
-function copyText(t){
-  if(navigator.clipboard)navigator.clipboard.writeText(t).catch(()=>fb());else fb();
-  function fb(){const a=document.createElement("textarea");a.value=t;document.body.append(a);a.select();document.execCommand("copy");a.remove()}
+async function copyText(t){
+  try{if(await api().copy(t))return}catch(e){}
+  try{await navigator.clipboard.writeText(t);return}catch(e){}
+  const a=document.createElement("textarea");a.value=t;a.style.cssText="position:fixed;opacity:0";document.body.append(a);a.select();document.execCommand("copy");a.remove();
 }
 function copyCode(b){copyText(b.closest(".cbk").querySelector("code").innerText);const o=b.textContent;b.textContent="скопировано";setTimeout(()=>b.textContent=o,1100)}
 function copyMsg(b,i){const c=cur();copyText(c.msgs[i].text);b.textContent="готово";setTimeout(()=>b.textContent="копировать",1000)}
@@ -537,7 +673,8 @@ function renderChats(){
 function msgEl(m,i){
   const d=document.createElement("div");d.className="msg "+m.role;
   const u=m.role==="user";
-  d.innerHTML='<div class="av">'+(u?"Я":ic("spark",15))+'</div><div class="mb"><div class="who">'+(u?"Вы":"Cloud Code")+(u?"":'<button class="cb" onclick="copyMsg(this,'+i+')">копировать</button>')+'</div><div class="tx"></div></div>';
+  const cm=cur(),lastA=!u&&!S.busy&&cm&&i===cm.msgs.length-1&&i>0;
+  d.innerHTML='<div class="av">'+(u?"Я":ic("spark",15))+'</div><div class="mb"><div class="who">'+(u?"Вы":"Cloud Code")+(m.sec?'<span>· '+m.sec+' с</span>':'')+(u?"":'<button class="cb" onclick="copyMsg(this,'+i+')">копировать</button>')+(lastA?'<button class="cb" onclick="regen()">повторить</button>':'')+'</div><div class="tx"></div></div>';
   const tx=d.querySelector(".tx");
   if(u)tx.textContent=m.text;else tx.innerHTML=md(m.text);
   return d;
@@ -552,12 +689,51 @@ function renderMsgs(){
 }
 function bottom(force){const s=$("sc");if(force||s.scrollHeight-s.scrollTop-s.clientHeight<140)s.scrollTop=s.scrollHeight}
 function use(t){$("inp").value=t;grow();$("inp").focus()}
+function toast(t){$("hint").textContent=t;setTimeout(()=>{if(!S.busy)$("hint").innerHTML=HINT},2800)}
+function regen(){
+  const c=cur();if(S.busy||!c||c.msgs.length<2)return;
+  const u=c.msgs[c.msgs.length-2];if(u.role!=="user")return;
+  c.msgs.splice(-2);$("inp").value=u.text;renderMsgs();send();
+}
+async function exportChat(){
+  const c=cur();if(!c||!c.msgs.length){toast("Нечего экспортировать");return}
+  const t="# "+c.title+"\n\n"+c.msgs.map(m=>(m.role==="user"?"**Вы:**\n\n":"**Cloud Code:**\n\n")+m.text).join("\n\n---\n\n")+"\n";
+  const r=await api().export_chat(c.title,t);if(r)toast("Сохранено: "+r);
+}
+function setMode(){
+  const b=$("mode"),p=S.mode==="plan";
+  b.textContent=p?"Режим: план (только чтение)":"Режим: сборка";b.classList.toggle("plan",p);
+  b.title="Переключить режим. План: агент только анализирует и ничего не меняет в файлах";
+}
+function toggleMode(){S.mode=S.mode==="plan"?"build":"plan";setMode();S.cfgSet("mode",S.mode)}
+const CMDS=[
+["/объясни","Объяснить проект","Объясни, как устроен этот проект: структура, стек, ключевые файлы и как всё запускается."],
+["/ошибки","Найти и исправить ошибки","Найди ошибки и потенциальные баги в проекте и исправь их."],
+["/ревью","Ревью кода без изменений","Проведи ревью кода: проблемы, безопасность, читаемость. Ничего не меняй, дай только список замечаний с приоритетами."],
+["/тесты","Написать тесты","Напиши тесты для основного кода проекта и, если возможно, запусти их."],
+["/рефактор","Упростить код","Упрости и отрефактори код, не меняя поведение. Объясни, что изменил."],
+["/readme","Написать README","Напиши README с описанием, установкой и примерами запуска для этого проекта."],
+["/коммит","Сообщение коммита","Посмотри текущие изменения (git diff) и предложи понятное сообщение коммита."],
+["/план","Составить план","Составь пошаговый план реализации задачи, ничего не изменяя в файлах. Задача: "]];
+let SL=[],SI=0;
+function slashDraw(){
+  const p=$("slash");
+  p.innerHTML=SL.map((c,i)=>'<div class="it'+(i===SI?" on":"")+'" onmousedown="pick('+i+')"><b>'+c[0]+'</b><span>'+esc(c[1])+'</span></div>').join("");
+}
+function slash(){
+  const v=$("inp").value,p=$("slash");
+  if(!v.startsWith("/")||/\s/.test(v)){p.classList.add("hidden");SL=[];return}
+  SL=CMDS.filter(c=>c[0].startsWith(v.toLowerCase()));SI=0;
+  if(!SL.length){p.classList.add("hidden");return}
+  p.classList.remove("hidden");slashDraw();
+}
+function pick(i){const c=SL[i];if(!c)return;$("inp").value=c[2];$("slash").classList.add("hidden");SL=[];grow();$("inp").focus()}
 
 /* ---------- отправка и поток ---------- */
 function ctxOf(c){
   if(!c.msgs.length)return "";
-  let t="";for(const m of c.msgs.slice(-8))t+=(m.role==="user"?"Пользователь: ":"Ассистент: ")+m.text.slice(0,1500)+"\n";
-  return "Контекст предыдущей переписки в этом чате (для справки):\n"+t.slice(-6000);
+  let t="";for(const m of c.msgs.slice(-12))t+=(m.role==="user"?"Пользователь: ":"Ассистент: ")+m.text.slice(0,3500)+"\n\n";
+  return "Это продолжение диалога. История предыдущих сообщений (учитывай её как контекст, не повторяй):\n"+t.slice(-16000);
 }
 function setBusy(b){
   S.busy=b;const bt=$("btn");bt.innerHTML=b?ic("stop",14)+"Стоп":"Отправить"+ic("up",15);bt.classList.toggle("stop",b);
@@ -570,12 +746,12 @@ function stop(){if(S.busy){S.stopped=true;api().stop()}}
 function send(){
   const t=$("inp").value.trim();if(!t||S.busy)return;
   if(!cur()){S.chats.unshift({id:Date.now().toString(36),title:"Новый чат",msgs:[],ts:Date.now()});S.cur=S.chats[0].id}
-  const c=cur(),cont=S.last===c.id,ctx=cont?"":ctxOf(c);
+  const c=cur(),cont=false,ctx=ctxOf(c);
   c.msgs.push({role:"user",text:t});if(c.msgs.length===1)c.title=t.replace(/\s+/g," ").slice(0,48);
   const am={role:"assistant",text:""};c.msgs.push(am);c.ts=Date.now();
   $("inp").value="";grow();S.stopped=false;
   S.stream={c,am,body:null};setBusy(true);renderChats();renderMsgs();save();
-  api().send(t,$("model").value,cont,ctx);
+  api().send(t,$("model").value,cont,ctx,S.mode==="plan"?"plan":"");
 }
 function paint(){
   const s=S.stream;if(!s||!s.body)return;
@@ -591,14 +767,22 @@ function onDone(rc){
   if(S.stopped)s.am.text+=(s.am.text?"\n\n":"")+"_Остановлено_";
   else if(!s.am.text.trim())s.am.text="Пустой ответ. Проверь, что выбрана рабочая модель (кнопка обновления рядом с полем модели) и интернет доступен.";
   if(rc===0&&!S.stopped)S.last=s.c.id;else if(S.stopped)S.last=null;
+  if(!S.stopped)s.am.sec=Math.round((Date.now()-S.t0)/1000);
   if(s.body)s.body.innerHTML=md(s.am.text);
-  S.stream=null;setBusy(false);save();bottom();$("inp").focus();
+  S.stream=null;setBusy(false);renderMsgs();save();$("inp").focus();
 }
 
 /* ---------- ввод ---------- */
 function grow(){const t=$("inp");t.style.height="auto";t.style.height=Math.min(t.scrollHeight,200)+"px"}
-$("inp").addEventListener("input",grow);
-$("inp").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
+$("inp").addEventListener("input",()=>{grow();slash()});
+$("inp").addEventListener("keydown",e=>{
+  if(SL.length){
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();SI=(SI+(e.key==="ArrowDown"?1:-1)+SL.length)%SL.length;slashDraw();return}
+    if(e.key==="Tab"||(e.key==="Enter"&&!e.shiftKey)){e.preventDefault();pick(SI);return}
+    if(e.key==="Escape"){$("slash").classList.add("hidden");SL=[];return}
+  }
+  if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}
+});
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape")stop();
   if(e.ctrlKey||e.metaKey){
@@ -612,7 +796,7 @@ document.addEventListener("keydown",e=>{
 function toggleSb(){$("app").classList.toggle("collapsed")}
 function theme(){const l=document.documentElement.dataset.theme!=="light";setTheme(l?"light":"dark");S.cfgSet("theme",l?"light":"dark")}
 function setTheme(t){document.documentElement.dataset.theme=t;$("th").innerHTML=ic(t==="light"?"sun":"moon",16)}
-setTheme("dark");
+setTheme("dark");setMode();
 function tab(n){
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===n));
   ["chat","files","diff"].forEach(v=>$("v-"+v).classList.toggle("hidden",v!==n));
@@ -692,6 +876,8 @@ window.addEventListener("pywebviewready",async()=>{
   try{
     const st=await api().state();S.chats=st.chats.filter(c=>c.msgs&&c.msgs.length);S.cfg=st.cfg;
     setCwd(st.cfg.cwd);setTheme(st.cfg.theme||"dark");if(st.cfg.model)$("model").value=st.cfg.model;
+    S.mode=st.cfg.mode==="plan"?"plan":"build";setMode();
+    if(st.version)$("sig").innerHTML='Cloud Code <b>by m3lf1x</b> · v'+st.version;
     S.cur=S.chats[0]?S.chats[0].id:null;renderChats();renderMsgs();
   }catch(e){}
   try{
@@ -700,6 +886,7 @@ window.addEventListener("pywebviewready",async()=>{
       setStatus("on","opencode подключён");
       api().version().then(v=>{if(v)$("st").textContent="opencode подключён · v"+v}).catch(()=>{});
       loadModels();
+      api().check_update().then(r=>{if(r&&r.new)$("banner").insertAdjacentHTML("beforeend",'<div class="banner info"><span>Доступна новая версия <b>v'+esc(r.version)+'</b></span><button data-u="'+esc(r.url)+'" onclick="api().open_url(this.dataset.u)">Скачать'+ic("ext",13)+'</button></div>')}).catch(()=>{});
     }else{
       setStatus("off","opencode не найден");
       $("banner").innerHTML='<div class="banner">'+esc(r.message)+'</div>';
@@ -711,9 +898,34 @@ setTimeout(()=>{if($("st").textContent.startsWith("Проверка"))setStatus(
 </script></body></html>"""
 
 
+def _crash():
+    """Окно ошибки через user32 (работает всегда) + лог в ~/.cloud_code/error.log"""
+    tb = traceback.format_exc()
+    log = APP / "error.log"
+    try:
+        log.write_text(tb, encoding="utf-8")
+    except Exception:
+        pass
+    if WIN:
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(0, "Cloud Code не удалось запустить.\n\n" + tb[-1000:] + "\n\nЛог: " + str(log),
+                                             "Cloud Code", 0x10)
+        except Exception:
+            pass
+    else:
+        print(tb)
+
+
 if __name__ == "__main__":
-    api = Api()
-    api.window = webview.create_window("Cloud Code by m3lf1x", html=HTML, js_api=api,
-                                       width=1280, height=820, min_size=(760, 520),
-                                       background_color="#000000")
-    webview.start()
+    try:
+        if webview is None:
+            raise RuntimeError("Не удалось загрузить pywebview:\n" + _IMPORT_ERR)
+        fix_path()
+        api = Api()
+        api.window = webview.create_window("Cloud Code by m3lf1x", html=HTML, js_api=api,
+                                           width=1280, height=820, min_size=(760, 520),
+                                           background_color="#000000")
+        webview.start()
+    except Exception:
+        _crash()
